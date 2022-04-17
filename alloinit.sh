@@ -62,7 +62,7 @@ dest="${args[0]}"
 # Directory to keep shared dependencies.
 lib="${lib:-"$(dirname "$dest")/lib"}"
 # Whether the dependency directory already existed before running the script.
-lib_exists="$(test -d "$lib" ; echo $?)"
+lib_existed="$(test -d "$lib" ; echo $?)"
 # Dependencies shared between allolib projects.
 deps=(
     allolib
@@ -83,7 +83,10 @@ function cleanup() {
     done
 
     # Remove lib if it did not exist prior to running alloinit.
-    [[ -d "$lib" ]] && [[ "$lib_exists" -eq 0 ]] || rmdir "$lib"
+    if [[ -d "$lib" ]] && ! [[ "$lib_existed" -eq 0 ]] &&
+        [[ -n "$(find "$lib" -maxdepth 0 -type d -empty 2> /dev/null)" ]] ; then
+        rmdir "$lib"
+    fi
 
     if [[ -f "$dest/$tmpfile" ]] ; then
         >&2 echo "Removing project \`$dest\`."
