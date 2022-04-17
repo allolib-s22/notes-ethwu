@@ -83,7 +83,7 @@ function cleanup() {
     done
 
     # Remove lib if it did not exist prior to running alloinit.
-    [[ -d "$lib" ]] && ! [[ "$lib_exists" -eq 0 ]] && rmdir "$lib"
+    [[ -d "$lib" ]] && [[ "$lib_exists" -eq 0 ]] || rmdir "$lib"
 
     if [[ -f "$dest/$tmpfile" ]] ; then
         >&2 echo "Removing project \`$dest\`."
