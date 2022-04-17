@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Propaga non-zero error codes in pipelines.
+# Propagate non-zero error codes in pipelines.
 set -o pipefail
 
 # Usage information.
@@ -24,8 +24,13 @@ Options:
     -l <lib_dir>    Specify the directory to install allolib dependencies to.
     -h              Show this help text."
 
+function show_usage() {
+    width="$(tput cols)"
+    echo "$usage" | fold -s -w $((width > 80 ? 80 : width))
+}
+
 if [[ $# -lt 1 ]] ; then
-    echo "$usage"
+    show_usage
     exit 0
 fi
 
@@ -38,7 +43,7 @@ while [[ $OPTIND -le $# ]] ; do
                 lib="$OPTARG"
                 ;;
             h)
-                echo "$usage"
+                show_usage
                 exit 0
                 ;;
             ?)
@@ -78,7 +83,7 @@ function cleanup() {
     done
 
     # Remove lib if it did not exist prior to running alloinit.
-    [[ "$lib_exists" -eq 0 ]] || rmdir "$lib"
+    [[ -d "$lib" ]] && ! [[ "$lib_exists" -eq 0 ]] && rmdir "$lib"
 
     if [[ -f "$dest/$tmpfile" ]] ; then
         >&2 echo "Removing project \`$dest\`."
@@ -114,7 +119,9 @@ git clone --bare git@github.com:Allosphere-Research-Group/allotemplate.git "$des
 git_flags=(--git-dir "$dest/.git" --work-tree "$dest")
 git "${git_flags[@]}" config core.bare false 2>&1 | indent || exit $?
 git "${git_flags[@]}" checkout 2>&1 | indent || exit $?
-git "${git_flags[@]}" remote rename origin allotemplate 2>&1 | indent || exit $?
+# This command faces a fatal error unsetting remote.allotemplate.fetch, but
+# otherwise seems to succeed.
+git "${git_flags[@]}" remote rename origin allotemplate 2>&1 | indent # || exit $?
 
 printf "\n\n# Allolib Dependencies\n" >> "$dest/.gitignore"
 mkdir -p "$lib" || exit $?
