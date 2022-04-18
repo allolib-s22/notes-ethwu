@@ -3,25 +3,29 @@
 # Propagate non-zero error codes in pipelines.
 set -o pipefail
 
+# Data directory.
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}/alloinit"
+
 # Usage information.
 usage="$0
 Start a new allolib project.
 
-Usage: $0 [options...] <dir>
+Usage:
+    $0 [options...] <dir>
 
-Creates a new allolib project in the directory <dir> as a clone of allotemplate. \
-Projects created using $0 share dependencies, obviating the need to clone \
-submodules every time you need to start a new project. The created project will \
-have allotemplate set to its own remote, allowing you to specify a different \
-origin remote.
-
-$0 uses symbolic links in order to connect the project directory to the shared \
-allolib dependencies. The generated symbolic links will point to absolute paths. \
-If the allolib dependency directory is moved, generated symbolic links will have \
-to be remade manually.
+Start a new allolib project in the directory <dir>. The generated project is a \
+configured clone of allotemplate, with the \`origin\` remote unset and the \
+allotemplate repository available on the remote \`allotemplate\`. The allolib \
+dependencies--\`allolib\` (the allolib library) and \`al_ext\` (the stable set \
+of allolib extensions)--are shared between projects created by $0 using \
+symbolic links, saving disk space and obviating the need to recursively \
+download dependencies whenever starting a new allolib project. If the \
+dependency directories are moved, then the symbolic links must be changed to \
+reflect the new locations before the project will compile.
 
 Options:
     -l <lib_dir>    Specify the directory to install allolib dependencies to.
+                    [Default: $data_home]
     -h              Show this help text."
 
 function show_usage() {
@@ -59,8 +63,13 @@ done
 
 # Directory to set up allolib project in.
 dest="${args[0]}"
+if [[ -z "$dest" ]] ; then
+    >&2 echo 'Error: Project directory required.'
+    >&2 show_usage
+    exit 1
+fi
 # Directory to keep shared dependencies.
-lib="${lib:-"$(dirname "$dest")/lib"}"
+lib="${lib:-$data_home}"
 # Whether the dependency directory already existed before running the script.
 lib_existed="$(test -d "$lib" ; echo $?)"
 # Dependencies shared between allolib projects.
@@ -126,7 +135,7 @@ git "${git_flags[@]}" checkout 2>&1 | indent || exit $?
 # otherwise seems to succeed.
 git "${git_flags[@]}" remote rename origin allotemplate 2>&1 | indent # || exit $?
 
-printf "\n\n# Allolib Dependencies\n" >> "$dest/.gitignore"
+printf "\n\n# allolib dependencies\n" >> "$dest/.gitignore"
 mkdir -p "$lib" || exit $?
 for dep in "${deps[@]}" ; do
     if [[ ! -d "$lib/$dep" ]] ; then
@@ -144,7 +153,7 @@ for dep in "${deps[@]}" ; do
 done
 
 >&2 echo 'Configuring allolib project.'
-(cd "$dest" && ./configure.sh ) || exit $?
+(cd "$dest" && ./configure.sh ) 2>&1 | indent || exit $?
 
 >&2 echo 'Removing unusable scripts (init.sh; distclean.sh).'
 rm "$dest/"{init,distclean}.sh || exit $?
