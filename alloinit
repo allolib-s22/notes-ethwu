@@ -60,10 +60,10 @@ dependency directories are moved, then the symbolic links will need to be \
 relinked using the flag $g-r$n.
 
 ${y}Usage$n:
-    $g$name [-l <libs>] <dir>$n    Start a new Allolib project in <dir>.
-    $g$name [-l <libs>] -r <dir>$n Relink Allolib dependencies in <dir>.
-    $g$name [-l <libs>] -u$n       Update Allolib dependencies.
-    $g$name [-l <libs>] -L$n       Just install Allolib dependencies.
+    $g$name [OPTIONS] <dir>$n    Start a new Allolib project in <dir>.
+    $g$name [OPTIONS] -r <dir>$n Relink Allolib dependencies in <dir>.
+    $g$name [OPTIONS] -u$n       Update Allolib dependencies.
+    $g$name [OPTIONS] -L$n       Just install Allolib dependencies.
 
 ${y}Options$n:
     $g-l <libs>$n   Specify the directory to install Allolib dependencies
@@ -71,6 +71,10 @@ ${y}Options$n:
     $g-r$n          Relink dependencies. Useful if you have moved Allolib.
     $g-u$n          Update dependencies.
     $g-L$n          Install dependencies without initializing a project.
+    $g-N$n          Install without linking dependencies, adding them as Git
+                submodules instead. When Allolib dependencies are installed
+                this way, the $g-u$n flag can be used to update Allolib by
+                passing the root of the project to $g-l$n.
     $g-h$n          Show this help text.
     $g-V$n          Show the version.
 
@@ -89,7 +93,7 @@ args=()
 # Subcommand to execute.
 subcommand=init
 while [[ $OPTIND -le $# ]] ; do
-    if getopts 'l:ruLhV' opt ; then
+    if getopts 'l:ruLNhV' opt ; then
         case "$opt" in
         l)
             lib="$OPTARG"
@@ -102,6 +106,9 @@ while [[ $OPTIND -le $# ]] ; do
             ;;
         L)
             subcommand=installdeps
+            ;;
+        N)
+            nolink=1
             ;;
         h)
             show_usage
@@ -209,15 +216,31 @@ function install_dependencies() {
 # Link dependencies to a project. If the first argument is set, also amends the
 # `.gitignore` to ignore the dependency links.
 function link_dependencies() {
-    local write_gitignore=$1
-    [[ -z $write_gitignore ]] || printf "\n\n# allolib dependencies\n" >> "$dest/.gitignore"
-    for dep in "${deps[@]}" ; do
-        loc="$(readlink -f "$lib/$dep")" || exit $?
-        [[ -z $write_gitignore ]] || printf "/$dep\n" >> "$dest/.gitignore"
-        info "Linking dependency \`$dep\` to \`$loc\`."
-        ln -sf "$loc" "$dest" || exit $?
-    done
+    if ! [[ -n $nolink ]] ; then
+        warn "Not linking dependencies."
+    else
+        local write_gitignore=$1
+        [[ -z $write_gitignore ]] || printf "\n\n# allolib dependencies\n" >> "$dest/.gitignore"
+        for dep in "${deps[@]}" ; do
+            loc="$(readlink -f "$lib/$dep")" || exit $?
+            [[ -z $write_gitignore ]] || printf "/$dep\n" >> "$dest/.gitignore"
+            info "Linking dependency \`$dep\` to \`$loc\`."
+            ln -sf "$loc" "$dest" || exit $?
+        done
+    fi
 }
+
+# Add dependencies as submodules to a project. Only used when the -N (nolink)
+# flag is passed.
+function add_dependencies_as_submodules() (
+    cd "$1"
+    info "Adding dependencies as submodules in \`$1\`."
+    for dep in "${deps[@]}" ; do
+        git submodule add "git@github.com:Allosphere-Research-Group/$dep.git" \
+            2>&1 | indent || exit $?
+    done
+    git submodule update --init --recursive 2>&1 | indent || exit $?
+)
 
 
 # Execute subcommand:
@@ -225,8 +248,8 @@ case $subcommand in
 relink)
     info "Relinking dependencies in project \`$dest\`."
     # Install and link dependencies again, but do not write to `.gitignore`.
-    install_dependencies
-    link_dependencies
+    install_dependencies || exit $?
+    link_dependencies || exit $?
     success "Successfully relinked dependencies in \`$dest\`!"
     ;;
 update)
@@ -250,7 +273,7 @@ update)
     success "Successfully updated Allolib dependencies in \`$lib\`!"
     ;;
 installdeps)
-    install_dependencies
+    install_dependencies || exit $?
     success "Successfully installed Allolib dependencies to \`$lib\`!"
     ;;
 init)
@@ -280,8 +303,12 @@ init)
     ) 2>&1 | indent || exit $?
 
     # Install dependencies, link them, and write their names to the `.gitignore`.
-    install_dependencies
-    link_dependencies write_gitignore
+    if [[ -n $nolink ]] ; then
+        add_dependencies_as_submodules "$dest" || exit $?
+    else
+        install_dependencies || exit $?
+        link_dependencies write_gitignore || exit $?
+    fi
 
     info 'Configuring allolib project.'
     (cd "$dest" && ./configure.sh ) 2>&1 | indent || exit $?

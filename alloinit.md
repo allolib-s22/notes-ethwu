@@ -19,6 +19,13 @@ Update Allolib dependencies ([`allolib`][allolib] and [`al_ext`][al_ext]):
 alloinit -u
 ```
 
+Start an [`allotemplate`][allotemplate] project with submoduled instead of
+symlinked dependencies (i.e., a traditional project):
+
+```sh
+alloinit -N proj
+```
+
 #### Advanced Usage ####
 
 Specify the Allolib dependency directory (default is `$XDG_DATA_HOME/alloinit/`):
@@ -53,6 +60,11 @@ alloinit project
 cd project
 ./run.sh
 ```
+
+> If you don't want symlinked dependencies, then call `alloinit` with the `-N`
+> flag, which adds `allolib` and `al_ext` as Git submodules. This will produce
+> a traditional `allotemplate` project, but will take the normal amount of time
+> to create and configure.
 
 This creates a new Allolib project in the directory `project`. `project` is a
 clone of the `allotemplate` repository, complete with history and branches.
