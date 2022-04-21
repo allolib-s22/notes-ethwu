@@ -6,7 +6,7 @@ if [ "${BASH_VERSINFO:-0}" -lt 3 ] ; then
 fi
 
 # Dependencies needed to run `alloinit`.
-alloinit_deps=( fold git ln mkdir readlink rm rmdir sed touch tput )
+alloinit_deps=( basename find fold git ln mkdir readlink rm rmdir sed touch tput )
 for dep in "${alloinit_deps[@]}" ; do
     if ! [[ "$(command -v "$dep")" ]] ; then
         >&2 echo "$0 requires $dep."
@@ -20,27 +20,38 @@ set -o pipefail
 # Data directory.
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}/alloinit"
 
+# Name of the script.
+name="$(basename $0)"
 # Usage information.
 usage="$0
-Start a new allolib project.
+One-step Allolib project initializer.
 
 Usage:
-    $0 [options...] <dir>
+    $name [-l <lib_dir>] <dir>      # Start a new Allolib project in <dir>.
+    $name [-l <lib_dir>] -r <dir>   # Relink Allolib dependencies in <dir>.
+    $name [-l <lib_dir>] -u         # Update Allolib dependencies.
+    $name [-l <lib_dir>] -L         # Just install Allolib dependencies.
 
-Start a new allolib project in the directory <dir>. The generated project is a \
+Start a new Allolib project in the directory <dir>. The generated project is a \
 configured clone of allotemplate, with the \`origin\` remote unset and the \
-allotemplate repository available on the remote \`allotemplate\`. The allolib \
-dependencies--\`allolib\` (the allolib library) and \`al_ext\` (the stable set \
-of allolib extensions)--are shared between projects created by $0 using \
+allotemplate repository available on the remote \`allotemplate\`. The Allolib \
+dependencies--\`allolib\` (the Allolib library) and \`al_ext\` (the stable set \
+of Allolib extensions)--are shared between projects created by $name using \
 symbolic links, saving disk space and obviating the need to recursively \
 download dependencies whenever starting a new allolib project. If the \
-dependency directories are moved, then the symbolic links must be changed to \
-reflect the new locations before the project will compile.
+dependency directories are moved, then the symbolic links will need to be \
+relinked using the flag -r.
 
 Options:
     -l <lib_dir>    Specify the directory to install allolib dependencies to.
                     [Default: $data_home]
-    -h              Show this help text."
+    -r              Relink dependencies. Useful if you have moved <lib_dir>.
+    -u              Update dependencies.
+    -L              Install dependencies without initializing a project.
+    -h              Show this help text.
+
+Full Documentation:
+    https://allolib-s22.github.io/notes-ethwu/alloinit.html"
 
 function show_usage() {
     width="$(tput cols)"
@@ -54,19 +65,30 @@ fi
 
 # Positional arguments.
 args=()
+# Subcommand to execute.
+subcommand=init
 while [[ $OPTIND -le $# ]] ; do
-    if getopts 'l:h' opt ; then
+    if getopts 'l:ruLh' opt ; then
         case "$opt" in
-            l)
-                lib="$OPTARG"
-                ;;
-            h)
-                show_usage
-                exit 0
-                ;;
-            ?)
-                exit 1
-                ;;
+        l)
+            lib="$OPTARG"
+            ;;
+        r)
+            subcommand=relink
+            ;;
+        u)
+            subcommand=update
+            ;;
+        L)
+            subcommand=installdeps
+            ;;
+        h)
+            show_usage
+            exit 0
+            ;;
+        ?)
+            exit 1
+            ;;
         esac
     else
         # Store positional argument.
@@ -77,8 +99,8 @@ done
 
 # Directory to set up allolib project in.
 dest="${args[0]}"
-if [[ -z "$dest" ]] ; then
-    >&2 echo 'Error: Project directory required.'
+if [[ $subcommand =~ (init|relink) ]] && [[ -z "$dest" ]] ; then
+    >&2 echo 'ERROR: Project directory required.'
     >&2 show_usage
     exit 1
 fi
@@ -97,30 +119,32 @@ tmpfile=.alloinit.tmp
 
 # Clean up in case of early abort.
 function cleanup() {
-    >&2 echo "Could not finish; cleaning up."
-    for dep in "${deps[@]}" ; do
-        if [[ -f "$lib/.$dep$tmpfile" ]] ; then
-            >&2 echo "Removing dependency \`$lib/$dep\`."
-            rm -rf "$lib/$dep" "$lib/.$dep$tmpfile"
+    if [[ $subcommand == init ]] ; then
+        >&2 echo "Could not finish; cleaning up."
+        for dep in "${deps[@]}" ; do
+            if [[ -f "$lib/.$dep$tmpfile" ]] ; then
+                >&2 echo "Removing dependency \`$lib/$dep\`."
+                rm -rf "$lib/$dep" "$lib/.$dep$tmpfile"
+            fi
+        done
+
+        # Remove lib if it did not exist prior to running alloinit.
+        if [[ -d "$lib" ]] && ! [[ "$lib_existed" -eq 0 ]] &&
+            [[ -n "$(find "$lib" -maxdepth 0 -type d -empty 2> /dev/null)" ]] ; then
+            rmdir "$lib"
         fi
-    done
 
-    # Remove lib if it did not exist prior to running alloinit.
-    if [[ -d "$lib" ]] && ! [[ "$lib_existed" -eq 0 ]] &&
-        [[ -n "$(find "$lib" -maxdepth 0 -type d -empty 2> /dev/null)" ]] ; then
-        rmdir "$lib"
-    fi
-
-    if [[ -f "$dest/$tmpfile" ]] ; then
-        >&2 echo "Removing project \`$dest\`."
-        rm -rf "$dest"
+        if [[ -f "$dest/$tmpfile" ]] ; then
+            >&2 echo "Removing project \`$dest\`."
+            rm -rf "$dest"
+        fi
     fi
 }
 
 function onexit() {
     [[ $? -gt 0 ]] && cleanup
 
-    rm -f "$dest/$tmpfile"
+    [[ $subcommand == init ]] && rm -f "$dest/$tmpfile"
 }
 
 # Indent the output of subcommands and send output to stderr.
@@ -130,45 +154,102 @@ function indent() {
 
 trap onexit EXIT
 
-if [[ -d "$dest" ]] ; then
-    >&2 echo "Directory \`$dest\` already exists."
-    exit 1
-fi
+# Install allolib dependencies to $lib.
+function install_dependencies() {
+    mkdir -p "$lib" || exit $?
+    for dep in "${deps[@]}" ; do
+        if [[ ! -d "$lib/$dep" ]] ; then
+            touch "$lib/.$dep$tmpfile" || exit $?
+            >&2 echo "Retrieving dependency \`$dep\`:"
+            git clone "git@github.com:Allosphere-Research-Group/$dep.git" "$lib/$dep" \
+                --recurse-submodules \
+                --progress 2>&1 | indent || exit $?
+            rm -f "$lib/.$dep$tmpfile" || exit $?
+        fi
+    done
+}
 
->&2 echo "Initializing allolib project in \`$dest\`:"
-mkdir -p "$dest" || exit $?
-touch "$dest/$tmpfile" || exit $?
-git clone --bare git@github.com:Allosphere-Research-Group/allotemplate.git "$dest/.git" \
-    --progress 2>&1 | indent || exit $?
-git_flags=(--git-dir "$dest/.git" --work-tree "$dest")
-git "${git_flags[@]}" config core.bare false 2>&1 | indent || exit $?
-git "${git_flags[@]}" checkout 2>&1 | indent || exit $?
-# This command faces a fatal error unsetting remote.allotemplate.fetch, but
-# otherwise seems to succeed.
-git "${git_flags[@]}" remote rename origin allotemplate 2>&1 | indent # || exit $?
+# Link dependencies to a project. If the first argument is set, also amends the
+# `.gitignore` to ignore the dependency links.
+function link_dependencies() {
+    local write_gitignore=$1
+    [[ -z $write_gitignore ]] || printf "\n\n# allolib dependencies\n" >> "$dest/.gitignore"
+    for dep in "${deps[@]}" ; do
+        loc="$(readlink -f "$lib/$dep")" || exit $?
+        [[ -z $write_gitignore ]] || printf "/$dep\n" >> "$dest/.gitignore"
+        >&2 echo "Linking dependency \`$dep\` to \`$loc\`."
+        ln -sf "$loc" "$dest" || exit $?
+    done
+}
 
-printf "\n\n# allolib dependencies\n" >> "$dest/.gitignore"
-mkdir -p "$lib" || exit $?
-for dep in "${deps[@]}" ; do
-    if [[ ! -d "$lib/$dep" ]] ; then
-        touch "$lib/.$dep$tmpfile" || exit $?
-        >&2 echo "Retrieving dependency \`$dep\`:"
-        git clone "git@github.com:Allosphere-Research-Group/$dep.git" "$lib/$dep" \
-            --recurse-submodules \
-            --progress 2>&1 | indent || exit $?
-        rm -f "$lib/.$dep$tmpfile" || exit $?
+
+# Execute subcommand:
+case $subcommand in
+relink)
+    >&2 echo "Relinking dependencies in project \`$dest\`."
+    # Install and link dependencies again, but do not write to `.gitignore`.
+    install_dependencies
+    link_dependencies
+    ;;
+update)
+    # Update existing libraries.
+    for dep in "${deps[@]}" ; do
+        if ! [[ -d "$lib/$dep" ]] ; then
+            >&2 echo "ERROR: \`$dep\` not installed in \`$lib\`."
+            exit 1
+        fi
+        >&2 echo "Updating dependency \`$dep\`:"
+        (
+            cd "$lib/$dep"
+            # Sync upstream changes to the URL of submodules.
+            git submodule sync --recursive || exit $?
+            # Update submodules.
+            git submodule update --recursive --progress || exit $?
+            # Pull changes.
+            git pull --progress || exit $?
+        ) 2>&1 | indent || exit $?
+    done
+    ;;
+installdeps)
+    install_dependencies
+    ;;
+init)
+    if [[ -d "$dest" ]] ; then
+        >&2 echo "Directory \`$dest\` already exists."
+        exit 1
     fi
-    loc="$(readlink -f "$lib/$dep")" || exit $?
-    >&2 echo "Linking dependency \`$dep\` to \`$loc\`."
-    ln -s "$loc" "$dest" || exit $?
-    printf "/$dep\n" >> "$dest/.gitignore"
-done
 
->&2 echo 'Configuring allolib project.'
-(cd "$dest" && ./configure.sh ) 2>&1 | indent || exit $?
+    >&2 echo "Initializing allolib project in \`$dest\`:"
+    mkdir -p "$dest" || exit $?
+    # Mark that $dest is currently being initialized. Used for checking whether
+    # to delete it in case of an early exit.
+    touch "$dest/$tmpfile" || exit $?
+    # Clone `allotemplate` to $dest without checking anything out.
+    git clone --bare git@github.com:Allosphere-Research-Group/allotemplate.git "$dest/.git" \
+        --progress 2>&1 | indent || exit $?
+    (
+        cd "$dest"
+        # Set $dest to be a normal repo.
+        git config core.bare false || exit $?
+        # Check out files from `allotemplate`.
+        git checkout || exit $?
+        # Give `allotemplate` its own remote (not origin). This command faces a
+        # fatal error unsetting remote.allotemplate.fetch, but otherwise seems
+        # to succeed.
+        git remote rename origin allotemplate || true # ignore errors
+    ) 2>&1 | indent || exit $?
 
->&2 echo 'Removing unusable scripts (init.sh; distclean.sh).'
-rm "$dest/"{init,distclean}.sh || exit $?
+    # Install dependencies, link them, and write their names to the `.gitignore`.
+    install_dependencies
+    link_dependencies write_gitignore
 
->&2 echo "Allolib project initialized successfully in \`$dest\`."
+    >&2 echo 'Configuring allolib project.'
+    (cd "$dest" && ./configure.sh ) 2>&1 | indent || exit $?
+
+    >&2 echo 'Removing unusable scripts (init.sh; distclean.sh).'
+    rm "$dest/"{init,distclean}.sh || exit $?
+
+    >&2 echo "Allolib project initialized successfully in \`$dest\`."
+    ;;
+esac
 

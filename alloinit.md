@@ -3,20 +3,40 @@ title: alloinit
 ---
 ## `alloinit` ##
 
-> One-step `allotemplate` initializer!
+> One-step [`allotemplate`][allotemplate] initializer!
 
 ### Usage ###
 
-To initialize an `allotemplate` project in `dir`:
+Starting an [`allotemplate`][allotemplate] project in `proj`:
 
 ```sh
-alloinit <dir>
+alloinit proj
 ```
 
-To specify the directory to keep allolib dependencies in:
+Update Allolib dependencies ([`allolib`][allolib] and [`al_ext`][al_ext]):
 
 ```sh
-alloinit -l <lib_dir> <dir>
+alloinit -u
+```
+
+#### Advanced Usage ####
+
+Specify the Allolib dependency directory (default is `$XDG_DATA_HOME/alloinit/`):
+
+```sh
+alloinit -l ./lib proj
+```
+
+Relink a project’s Allolib dependencies:
+
+```sh
+alloinit -u proj
+```
+
+Install Allolib dependencies to a directory without building a new project:
+
+```sh
+alloinit -l ./lib -L
 ```
 
 ### Description ###
@@ -102,6 +122,14 @@ $ readlink allolib al_ext
 
 Because `alloinit` uses symbolic links, the links to `allolib` and `al_ext` will
 need to be redone if the actual locations of `allolib` or `al_ext` are changed.
+Use `alloinit -r` for this:
+
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD014 -->
+```sh
+$ alloinit -r proj
+```
+<!-- markdownlint-restore -->
 
 `alloinit` cleans up after itself if it’s closed early or if it encounters an
 error. If either `allolib` or `al_ext` have not finished downloading with all of
@@ -109,6 +137,20 @@ their dependencies, then `alloinit` removes the partially-finished download. It
 will also remove the partially-generated project. If `allolib` or `al_ext`
 finish downloading, however, then they will remain in place (allowing you to
 debug and try again without having to wait for them to download again).
+
+#### Allolib dependency management ####
+
+The Allolib dependencies in `<lib_dir>` can be updated with the `-u` flag.
+Allolib dependencies can be installed to a `<lib_dir>` without setting up a new
+project by passing the `-L` flag:
+
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD014 -->
+```sh
+$ alloinit -l ./lib -L  # Install Allolib dependencies to `./lib`.
+$ alloinit -l ./lib -u  # Update Allolib dependencies in `./lib`.
+```
+<!-- markdownlint-restore -->
 
 ### Installation ###
 
