@@ -50,6 +50,12 @@ $g$0$n $version
 One-step Allolib project initializer.
 
 ${y}Usage$n:
+    $g$name -N <dir>$n           Start a traditional Allotemplate project
+                                in <dir> using Git submodules (i.e., without
+                                shared Allolib between projects).
+    $g$name -l <dir> -u$n        Update dependencies for traditional
+                                project in <dir>.
+
     $g$name [OPTIONS] <dir>$n    Start a new Allolib project in <dir>.
     $g$name [OPTIONS] -r <dir>$n Relink Allolib dependencies in <dir>.
     $g$name [OPTIONS] -u$n       Update Allolib dependencies.
