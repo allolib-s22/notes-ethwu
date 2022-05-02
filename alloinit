@@ -21,7 +21,7 @@ set -o pipefail
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}/alloinit"
 
 # Color support if outputting to a terminal with color.
-if [[ -t 1 ]] && [[ -n "$(tput colors)" ]] ; then
+if [[ -t 1 ]] && [[ -n "$(tput colors)" ]] && [[ -z ${NO_COLOR+blank} ]] ; then
     bold="$(tput bold)"
     underline="$(tput smul)"
     normal="$(tput sgr0)"
