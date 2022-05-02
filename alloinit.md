@@ -75,11 +75,9 @@ cd project
 > a traditional `allotemplate` project, but will take the normal amount of time
 > to create and configure.
 
-This creates a new Allolib project in the directory `project`. `project` is a
-clone of the `allotemplate` repository, complete with history and branches.
-However, the remote `origin` is unset, allowing you to connect `project` to your
-own Git remote. `allotemplate` remains available on an eponymous remote,
-allowing you to pull updates. The `init.sh` and `distclean.sh` scripts are
+This creates a new Allolib project in the directory `project`. `allotemplate` is
+available on the remote `allotemplate` if you need to pull changes from the
+template later. The `init.sh` and `distclean.sh` scripts are
 removed, since they conflict with `alloinit`, and `allolib` and `al_ext` are
 added to the `.gitignore`.
 
@@ -104,9 +102,6 @@ Changes not staged for commit:
 	deleted:    init.sh
 no changes added to commit (use "git add" and/or "git commit -a")
 $ git branch
-  glv
-  legacy
-  lighting
 * master
 $ git remote
 allotemplate

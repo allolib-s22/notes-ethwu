@@ -6,7 +6,7 @@ if [ "${BASH_VERSINFO:-0}" -lt 3 ] ; then
 fi
 
 # Dependencies needed to run `alloinit`.
-alloinit_deps=( basename find fold git ln mkdir readlink rm rmdir sed touch tput )
+alloinit_deps=( basename find fold git ln mkdir readlink rm rmdir touch tput )
 for dep in "${alloinit_deps[@]}" ; do
     if ! [[ "$(command -v "$dep")" ]] ; then
         >&2 echo "$0 requires $dep."
@@ -34,7 +34,7 @@ fi
 # Name of the script.
 name="$(basename $0)"
 # Version.
-version='0.1.0'
+version='0.1.1'
 # Usage information.
 
 function show_usage() {
@@ -48,16 +48,6 @@ function show_usage() {
     fold -s -w $((width > 80 ? 80 : width)) <<EOF
 $g$0$n $version
 One-step Allolib project initializer.
-
-Start a new Allolib project in the directory <dir>. The generated project is a \
-configured clone of allotemplate, with the \`origin\` remote unset and the \
-allotemplate repository available on the remote \`allotemplate\`. The Allolib \
-dependencies--\`allolib\` (the Allolib library) and \`al_ext\` (the stable set \
-of Allolib extensions)--are shared between projects created by $name using \
-symbolic links, saving disk space and obviating the need to recursively \
-download dependencies whenever starting a new allolib project. If the \
-dependency directories are moved, then the symbolic links will need to be \
-relinked using the flag $g-r$n.
 
 ${y}Usage$n:
     $g$name [OPTIONS] <dir>$n    Start a new Allolib project in <dir>.
@@ -214,7 +204,7 @@ function install_dependencies() {
 # Link dependencies to a project. If the first argument is set, also amends the
 # `.gitignore` to ignore the dependency links.
 function link_dependencies() {
-    if ! [[ -n $nolink ]] ; then
+    if [[ -n $nolink ]] ; then
         warn "Not linking dependencies."
     else
         local write_gitignore=$1
@@ -285,19 +275,14 @@ init)
     # Mark that $dest is currently being initialized. Used for checking whether
     # to delete it in case of an early exit.
     touch "$dest/$tmpfile" || exit $?
-    # Clone `allotemplate` to $dest without checking anything out.
-    git clone --bare git@github.com:Allosphere-Research-Group/allotemplate.git "$dest/.git" \
-        --progress 2>&1 || exit $?
     (
         cd "$dest"
-        # Set $dest to be a normal repo.
-        git config core.bare false || exit $?
-        # Check out files from `allotemplate`.
-        git checkout || exit $?
-        # Give `allotemplate` its own remote (not origin). This command faces a
-        # fatal error unsetting remote.allotemplate.fetch, but otherwise seems
-        # to succeed.
-        git remote rename origin allotemplate || true # ignore errors
+        # Initialize an empty repository.
+        git init
+        # Pull changes from `allotemplate` as its own remote.
+        git remote add allotemplate git@github.com:Allosphere-Research-Group/allotemplate.git \
+            || exit $?
+        git pull allotemplate master || exit $?
     ) 2>&1 || exit $?
 
     # Install dependencies, link them, and write their names to the `.gitignore`.
