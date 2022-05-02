@@ -1,7 +1,7 @@
 ---
 title: alloinit
 ---
-## `alloinit` ##
+## `alloinit` ([download][alloinit-download]) ##
 
 > One-step [`allotemplate`][allotemplate] initializer!
 
@@ -19,11 +19,20 @@ Update Allolib dependencies ([`allolib`][allolib] and [`al_ext`][al_ext]):
 alloinit -u
 ```
 
-Start an [`allotemplate`][allotemplate] project with submoduled instead of
+Start an [`allotemplate`][allotemplate] project with submodule instead of
 symlinked dependencies (i.e., a traditional project):
 
 ```sh
 alloinit -N proj
+```
+
+### Installation ###
+
+Get `alloinit` [here][alloinit-download] or use:
+
+```sh
+curl https://allolib-s22.github.io/notes-ethwu/alloinit > alloinit
+chmod +x ./alloinit
 ```
 
 #### Advanced Usage ####

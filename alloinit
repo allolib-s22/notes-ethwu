@@ -192,9 +192,6 @@ function onexit() {
     [[ $subcommand == init ]] && rm -f "$dest/$tmpfile"
 }
 
-# Indent the output of subcommands and send output to stderr.
-function indent() { sed -ur "s/(^|\r)/\1\t/g" >&2 ; }
-
 trap onexit EXIT
 
 
@@ -207,7 +204,8 @@ function install_dependencies() {
             info "Retrieving dependency \`$dep\`:"
             git clone "git@github.com:Allosphere-Research-Group/$dep.git" "$lib/$dep" \
                 --recurse-submodules \
-                --progress 2>&1 | indent || exit $?
+                --depth 1 \
+                --progress 2>&1 || exit $?
             rm -f "$lib/.$dep$tmpfile" || exit $?
         fi
     done
@@ -237,9 +235,9 @@ function add_dependencies_as_submodules() (
     info "Adding dependencies as submodules in \`$1\`."
     for dep in "${deps[@]}" ; do
         git submodule add "git@github.com:Allosphere-Research-Group/$dep.git" \
-            2>&1 | indent || exit $?
+            2>&1 || exit $?
     done
-    git submodule update --init --recursive 2>&1 | indent || exit $?
+    git submodule update --init --recursive --depth 1 2>&1 || exit $?
 )
 
 
@@ -268,7 +266,7 @@ update)
             git submodule update --recursive --progress || exit $?
             # Pull changes.
             git pull --progress || exit $?
-        ) 2>&1 | indent || exit $?
+        ) 2>&1 || exit $?
     done
     success "Successfully updated Allolib dependencies in \`$lib\`!"
     ;;
@@ -289,7 +287,7 @@ init)
     touch "$dest/$tmpfile" || exit $?
     # Clone `allotemplate` to $dest without checking anything out.
     git clone --bare git@github.com:Allosphere-Research-Group/allotemplate.git "$dest/.git" \
-        --progress 2>&1 | indent || exit $?
+        --progress 2>&1 || exit $?
     (
         cd "$dest"
         # Set $dest to be a normal repo.
@@ -300,7 +298,7 @@ init)
         # fatal error unsetting remote.allotemplate.fetch, but otherwise seems
         # to succeed.
         git remote rename origin allotemplate || true # ignore errors
-    ) 2>&1 | indent || exit $?
+    ) 2>&1 || exit $?
 
     # Install dependencies, link them, and write their names to the `.gitignore`.
     if [[ -n $nolink ]] ; then
@@ -311,7 +309,7 @@ init)
     fi
 
     info 'Configuring allolib project.'
-    (cd "$dest" && ./configure.sh ) 2>&1 | indent || exit $?
+    (cd "$dest" && ./configure.sh ) 2>&1 || exit $?
 
     info 'Removing unusable scripts (init.sh; distclean.sh).'
     rm "$dest/"{init,distclean}.sh || exit $?
