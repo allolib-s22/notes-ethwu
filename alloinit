@@ -6,7 +6,7 @@ if [ "${BASH_VERSINFO:-0}" -lt 3 ] ; then
 fi
 
 # Dependencies needed to run `alloinit`.
-alloinit_deps=( basename find fold git ln mkdir readlink rm rmdir touch tput )
+alloinit_deps=( basename find fold git ln mkdir rm rmdir touch tput )
 for dep in "${alloinit_deps[@]}" ; do
     if ! [[ "$(command -v "$dep")" ]] ; then
         >&2 echo "$0 requires $dep."
@@ -34,7 +34,7 @@ fi
 # Name of the script.
 name="$(basename $0)"
 # Version.
-version='0.1.1'
+version='0.1.2'
 # Usage information.
 
 function show_usage() {
@@ -216,7 +216,11 @@ function link_dependencies() {
         local write_gitignore=$1
         [[ -z $write_gitignore ]] || printf "\n\n# allolib dependencies\n" >> "$dest/.gitignore"
         for dep in "${deps[@]}" ; do
-            loc="$(readlink -f "$lib/$dep")" || exit $?
+            if ! [[ -d "$lib/$dep" ]] ; then
+                error "\`$lib/$deps\` is not a directory."
+                exit 1
+            fi
+            loc="$(cd "$lib/$dep" && pwd)" || exit $?
             [[ -z $write_gitignore ]] || printf "/$dep\n" >> "$dest/.gitignore"
             info "Linking dependency \`$dep\` to \`$loc\`."
             ln -sf "$loc" "$dest" || exit $?

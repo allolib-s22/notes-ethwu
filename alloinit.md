@@ -10,20 +10,20 @@ title: alloinit
 Starting an [`allotemplate`][allotemplate] project in `proj`:
 
 ```sh
-alloinit proj
+./alloinit proj
 ```
 
 Update Allolib dependencies ([`allolib`][allolib] and [`al_ext`][al_ext]):
 
 ```sh
-alloinit -u
+./alloinit -u
 ```
 
 Start an [`allotemplate`][allotemplate] project with submodule instead of
 symlinked dependencies (i.e., a traditional project):
 
 ```sh
-alloinit -N proj
+./alloinit -N proj
 ```
 
 ### Installation ###
@@ -33,6 +33,7 @@ Get `alloinit` [here][alloinit-download] or use:
 ```sh
 curl https://allolib-s22.github.io/notes-ethwu/alloinit > alloinit
 chmod +x ./alloinit
+./alloinit -h
 ```
 
 #### Advanced Usage ####
